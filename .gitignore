@@ -1,0 +1,74 @@
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+.Python
+
+ai-service/models/olds
+
+# Python virtual environment
+venv/
+.venv/
+env/
+
+# Python environment variables
+.env
+.env.*
+!.env.example
+
+# Python testing and cache
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Node.js
+node_modules/
+frontend/node_modules/
+
+# React / Vite build
+frontend/dist/
+frontend/build/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+
+# Model training checkpoints
+runs/
+training_runs/
+
+# Keep trained model files out of Git
+*.pt
+*.onnx
+*.engine
+*.tflite
+*.xml
+*.bin
+
+# Keep model directory structure
+!ai-service/models/.gitkeep
