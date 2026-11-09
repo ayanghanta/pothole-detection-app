@@ -62,6 +62,7 @@ async def predict(file: UploadFile = File(...)):
 
     height, width = image.shape[:2]
 
+
     # Run YOLO detection
     # results = model.predict(
     #     source=image,

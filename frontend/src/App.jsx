@@ -1,187 +1,147 @@
 import { useEffect, useRef, useState } from "react";
-
-const API_URL = "http://127.0.0.1:8000";
-
+import ControllButton from "./components/ControllButton";
+import { useDrawBoundingBoxInCanvas } from "./hooks/useDrawBoundingBoxInCanvas";
 function App() {
-  const videoRef = useRef(null);
-  const overlayRef = useRef(null);
-  const busyRef = useRef(false);
+  const [isReady, setIsReady] = useState(false);
+  const [videoError, setVideoError] = useState(null);
+  const [isDetectionOn, setIsDetectionOn] = useState(false);
 
-  const [cameraActive, setCameraActive] = useState(false);
-  const [detections, setDetections] = useState([]);
-  const [error, setError] = useState("");
+  const cameraVideoRef = useRef(null);
+  const cameraStreamInstance = useRef(null);
+  const captureCanvasRef = useRef(null);
 
-  // Start laptop camera
-  useEffect(() => {
-    let stream;
+  const DUMMY = [
+    {
+      box: { x1: 0, x2: 100, y1: 0, y2: 100 },
+      class_name: "text",
+      confidence: 0.5,
+    },
+    {
+      box: { x1: 50, x2: 130, y1: 90, y2: 120 },
+      class_name: "text",
+      confidence: 0.5,
+    },
+  ];
 
-    async function startCamera() {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: "environment",
-          },
-          audio: false,
-        });
+  const { overlayRef } = useDrawBoundingBoxInCanvas({
+    videoRef: cameraVideoRef,
+    detections: DUMMY,
+    isDetectionOn,
+  });
 
-        videoRef.current.srcObject = stream;
-        setCameraActive(true);
-      } catch (err) {
-        setError("Unable to access camera");
-      }
-    }
-
-    startCamera();
-
-    return () => {
-      stream?.getTracks().forEach((track) => track.stop());
-    };
+  // initlize canvas
+  useEffect(function () {
+    captureCanvasRef.current = document.createElement("canvas");
   }, []);
 
-  // Capture frame and send to FastAPI
-  useEffect(() => {
-    if (!cameraActive) return;
+  useEffect(
+    function () {
+      const startCamera = async () => {
+        setVideoError(null);
+        try {
+          cameraStreamInstance.current =
+            await navigator.mediaDevices.getUserMedia({
+              video: {
+                facingMode: "environment",
+              },
+              audio: false,
+            });
 
-    const captureFrame = async () => {
-      const video = videoRef.current;
-
-      if (!video || !video.videoWidth || busyRef.current) {
-        return;
-      }
-
-      busyRef.current = true;
-
-      try {
-        const canvas = document.createElement("canvas");
-
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-
-        const context = canvas.getContext("2d");
-
-        context.drawImage(video, 0, 0);
-
-        const blob = await new Promise((resolve) => {
-          canvas.toBlob(resolve, "image/jpeg", 0.8);
-        });
-
-        if (!blob) return;
-
-        const formData = new FormData();
-
-        formData.append("file", blob, "frame.jpg");
-
-        const response = await fetch(`${API_URL}/predict`, {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!response.ok) {
-          throw new Error("Detection API failed");
+          if (cameraVideoRef.current)
+            cameraVideoRef.current.srcObject = cameraStreamInstance.current;
+        } catch (err) {
+          console.error(err);
+          console.log("ERROR", err.message);
+          setVideoError(err);
         }
+      };
 
-        const result = await response.json();
+      if (isReady) startCamera();
 
-        setDetections(result.detections);
+      // Clean up
+      return () => {
+        if (cameraStreamInstance.current) {
+          cameraStreamInstance.current
+            .getTracks()
+            .forEach((track) => track.stop());
+        }
+      };
+    },
 
-        setError("");
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        busyRef.current = false;
-      }
-    };
+    [isReady],
+  );
 
-    const interval = setInterval(captureFrame, 700);
+  function handleStopCamera() {
+    if (!cameraStreamInstance.current) return;
+    cameraStreamInstance.current.getTracks().forEach((track) => track.stop());
+    cameraStreamInstance.current = null;
 
-    return () => clearInterval(interval);
-  }, [cameraActive]);
+    if (cameraVideoRef.current) {
+      cameraVideoRef.current.srcObject = null;
+    }
+  }
 
-  // Draw YOLO bounding boxes over video
-  useEffect(() => {
-    const video = videoRef.current;
-    const canvas = overlayRef.current;
-
-    if (!video || !canvas || !video.videoWidth) return;
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    const ctx = canvas.getContext("2d");
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    detections.forEach((detection) => {
-      const { x1, y1, x2, y2 } = detection.box;
-
-      const width = x2 - x1;
-      const height = y2 - y1;
-
-      ctx.strokeStyle = "#00ff00";
-      ctx.lineWidth = 3;
-
-      ctx.strokeRect(x1, y1, width, height);
-
-      const label = `${detection.class_name} ${(detection.confidence * 100).toFixed(1)}%`;
-
-      ctx.font = "16px Arial";
-
-      const textWidth = ctx.measureText(label).width;
-
-      ctx.fillStyle = "#00ff00";
-      ctx.fillRect(x1, Math.max(0, y1 - 24), textWidth + 10, 24);
-
-      ctx.fillStyle = "#000000";
-      ctx.fillText(label, x1 + 5, Math.max(17, y1 - 7));
-    });
-  }, [detections]);
+  if (!isReady) return <p onClick={() => setIsReady(true)}>Start the app</p>;
 
   return (
-    <div style={{ padding: "25px", fontFamily: "Arial" }}>
-      <h1>Live Pothole Detection</h1>
+    <div>
+      <div>
+        {/* Video section */}
+        <div>
+          {videoError ? (
+            <div>
+              <h3>Camera Error</h3>
 
-      <p>Camera: {cameraActive ? "Active" : "Connecting..."}</p>
+              <p>Secure context: {String(window.isSecureContext)}</p>
 
-      {error && <p style={{ color: "red" }}>{error}</p>}
+              <p>
+                Camera API available:{" "}
+                {String(Boolean(navigator.mediaDevices?.getUserMedia))}
+              </p>
 
-      <div
-        style={{
-          position: "relative",
-          width: "100%",
-          maxWidth: "800px",
-        }}
-      >
-        <video
-          ref={videoRef}
-          autoPlay
-          muted
-          playsInline
-          onLoadedMetadata={(event) => event.currentTarget.play()}
-          style={{
-            width: "100%",
-            display: "block",
-          }}
-        />
+              <p>Error name: {videoError.name}</p>
 
-        <canvas
-          ref={overlayRef}
-          style={{
-            position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
-            pointerEvents: "none",
-          }}
-        />
+              <p>Error message: {videoError.message}</p>
+            </div>
+          ) : (
+            <>
+              <video
+                ref={cameraVideoRef}
+                autoPlay
+                muted
+                playsInline
+                onLoadedMetadata={(event) => event.currentTarget.play()}
+                className="w-3/5"
+              />
+
+              {isDetectionOn && (
+                <canvas
+                  ref={overlayRef}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    pointerEvents: "none",
+                  }}
+                />
+              )}
+            </>
+          )}
+        </div>
+        {/* Stats Section */}
+        <div>Stats</div>
       </div>
-
-      <h3>Potholes detected: {detections.length}</h3>
-
-      {detections.map((item, index) => (
-        <p key={index}>
-          {item.class_name} - {(item.confidence * 100).toFixed(2)}%
-        </p>
-      ))}
+      {/* Controll section */}
+      <div className="flex gap-2.5 mt-2.5">
+        <ControllButton onClick={() => setIsDetectionOn(true)}>
+          Start Detection
+        </ControllButton>
+        <ControllButton onClick={() => setIsDetectionOn(false)}>
+          Stop Detection
+        </ControllButton>
+        <ControllButton onClick={handleStopCamera}>Stop Camera</ControllButton>
+      </div>
     </div>
   );
 }
