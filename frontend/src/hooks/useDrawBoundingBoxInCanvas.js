@@ -4,65 +4,68 @@ export function useDrawBoundingBoxInCanvas({
   videoRef,
   detections,
   isDetectionOn = true,
+  frameInfo,
 }) {
   const overlayRef = useRef(null);
 
-  useEffect(
-    function () {
-      if (!isDetectionOn) {
-        const canvas = overlayRef.current;
-        const ctx = canvas?.getContext("2d");
+  useEffect(() => {
+    const video = videoRef.current;
+    const canvas = overlayRef.current;
 
-        if (ctx) {
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-        }
+    if (!canvas) return;
 
-        return;
-      }
-      const video = videoRef?.current;
-      const canvas = overlayRef.current;
-      //   if (!video || !canvas || !video.videoWidth) return;
-      if (!video || !canvas) return;
+    const ctx = canvas.getContext("2d");
 
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-
-      const ctx = canvas.getContext("2d");
-
+    if (!isDetectionOn) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      return;
+    }
 
-      //   const d = {
-      //     box: { x1: 0, x2: 100, y1: 0, y2: 100 },
-      //     class_name: "text",
-      //     confidence: 0.5,
-      //   };
+    if (
+      !video ||
+      !video.videoWidth ||
+      !frameInfo?.width ||
+      !frameInfo?.height
+    ) {
+      return;
+    }
 
-      detections.forEach((detection) => {
-        const { x1, y1, x2, y2 } = detection.box;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
 
-        const width = x2 - x1;
-        const height = y2 - y1;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        ctx.strokeStyle = "#00ff00";
-        ctx.lineWidth = 3;
+    const scaleX = video.videoWidth / frameInfo.width;
+    const scaleY = video.videoHeight / frameInfo.height;
 
-        ctx.strokeRect(x1, y1, width, height);
+    detections.forEach((detection) => {
+      const { x1, y1, x2, y2 } = detection.box;
 
-        const label = `${detection.class_name} ${(detection.confidence * 100).toFixed(1)}%`;
+      const x = x1 * scaleX;
+      const y = y1 * scaleY;
+      const boxWidth = (x2 - x1) * scaleX;
+      const boxHeight = (y2 - y1) * scaleY;
 
-        ctx.font = "16px Arial";
+      ctx.strokeStyle = "#00ff00";
+      ctx.lineWidth = 3;
+      ctx.strokeRect(x, y, boxWidth, boxHeight);
 
-        const textWidth = ctx.measureText(label).width;
+      const label = `${detection.class_name} ${(
+        detection.confidence * 100
+      ).toFixed(1)}%`;
 
-        ctx.fillStyle = "#00ff00";
-        ctx.fillRect(x1, Math.max(0, y1 - 24), textWidth + 10, 24);
+      ctx.font = "16px Arial";
 
-        ctx.fillStyle = "#000000";
-        ctx.fillText(label, x1 + 5, Math.max(17, y1 - 7));
-      });
-    },
-    [videoRef, detections, isDetectionOn],
-  );
+      const textWidth = ctx.measureText(label).width;
+      const labelY = Math.max(0, y - 24);
+
+      ctx.fillStyle = "#00ff00";
+      ctx.fillRect(x, labelY, textWidth + 10, 24);
+
+      ctx.fillStyle = "#000000";
+      ctx.fillText(label, x + 5, Math.max(17, y - 7));
+    });
+  }, [videoRef, detections, isDetectionOn, frameInfo]);
 
   return { overlayRef };
 }

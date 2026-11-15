@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import ControllButton from "./components/ControllButton";
 import { useDrawBoundingBoxInCanvas } from "./hooks/useDrawBoundingBoxInCanvas";
+import { useDetection } from "./hooks/useDetection";
 function App() {
   const [isReady, setIsReady] = useState(false);
   const [videoError, setVideoError] = useState(null);
@@ -8,31 +9,24 @@ function App() {
 
   const cameraVideoRef = useRef(null);
   const cameraStreamInstance = useRef(null);
-  const captureCanvasRef = useRef(null);
 
-  const DUMMY = [
-    {
-      box: { x1: 0, x2: 100, y1: 0, y2: 100 },
-      class_name: "text",
-      confidence: 0.5,
-    },
-    {
-      box: { x1: 50, x2: 130, y1: 90, y2: 120 },
-      class_name: "text",
-      confidence: 0.5,
-    },
-  ];
+  const {
+    detections: potholesDetections,
+    frameInfo,
+    isDetecting,
+    error: detectionError,
+    startDetection,
+    stopDetection,
+  } = useDetection({
+    videoRef: cameraVideoRef,
+  });
 
   const { overlayRef } = useDrawBoundingBoxInCanvas({
     videoRef: cameraVideoRef,
-    detections: DUMMY,
+    detections: potholesDetections,
+    frameInfo,
     isDetectionOn,
   });
-
-  // initlize canvas
-  useEffect(function () {
-    captureCanvasRef.current = document.createElement("canvas");
-  }, []);
 
   useEffect(
     function () {
@@ -81,6 +75,18 @@ function App() {
     }
   }
 
+  function handleStartDetection() {
+    setIsDetectionOn(true);
+    startDetection();
+  }
+
+  function handleStopDetection() {
+    stopDetection();
+    setIsDetectionOn(false);
+  }
+
+  console.log({ detectionError });
+
   if (!isReady) return <p onClick={() => setIsReady(true)}>Start the app</p>;
 
   return (
@@ -104,40 +110,42 @@ function App() {
               <p>Error message: {videoError.message}</p>
             </div>
           ) : (
-            <>
+            <div
+              style={{
+                position: "relative",
+                width: "100%",
+                maxWidth: "800px",
+              }}
+            >
               <video
                 ref={cameraVideoRef}
                 autoPlay
                 muted
                 playsInline
                 onLoadedMetadata={(event) => event.currentTarget.play()}
-                className="w-3/5"
+                className="block w-full h-auto"
               />
 
               {isDetectionOn && (
                 <canvas
                   ref={overlayRef}
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    width: "100%",
-                    height: "100%",
-                    pointerEvents: "none",
-                  }}
+                  className="absolute inset-0 w-full h-full pointer-events-none"
                 />
               )}
-            </>
+            </div>
           )}
         </div>
         {/* Stats Section */}
-        <div>Stats</div>
+        <div>
+          <p>{isDetecting ? "Detecting" : "Not Detecting"}</p>
+        </div>
       </div>
       {/* Controll section */}
       <div className="flex gap-2.5 mt-2.5">
-        <ControllButton onClick={() => setIsDetectionOn(true)}>
+        <ControllButton onClick={handleStartDetection}>
           Start Detection
         </ControllButton>
-        <ControllButton onClick={() => setIsDetectionOn(false)}>
+        <ControllButton onClick={handleStopDetection}>
           Stop Detection
         </ControllButton>
         <ControllButton onClick={handleStopCamera}>Stop Camera</ControllButton>

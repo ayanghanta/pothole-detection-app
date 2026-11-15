@@ -1,1 +1,5 @@
 @import "tailwindcss";
+
+.font-manrope {
+  font-family: "Manrope", sans-serif;
+}
