@@ -63,7 +63,6 @@ runs/
 training_runs/
 
 # Keep trained model files out of Git
-*.pt
 *.onnx
 *.engine
 *.tflite
