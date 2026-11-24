@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 export default function Logo() {
   return (
     <div className="flex items-center gap-2">
@@ -7,9 +9,9 @@ export default function Logo() {
         className="w-9 h-9 object-contain"
       />
 
-      <span className="text-xl font-extrabold tracking-tight">
+      <Link to="/" className="text-xl font-extrabold tracking-tight">
         RoadSight<span className="text-[#52B788]">.</span>
-      </span>
+      </Link>
     </div>
   );
 }
